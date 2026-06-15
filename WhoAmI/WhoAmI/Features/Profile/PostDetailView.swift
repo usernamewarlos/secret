@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Doubles as the owner's "curate" view: the owner can hide public replies, and any author
 /// can reveal/re-hide their own reply. Private replies show only as named, locked markers.
+/// When a gist exists, offers the share-card and the evolution timeline.
 struct PostDetailView: View {
     let postId: UUID
     let promptText: String
@@ -9,6 +10,7 @@ struct PostDetailView: View {
 
     @Environment(AppContainer.self) private var container
     @State private var vm: PostDetailViewModel?
+    @State private var showingShare = false
 
     var body: some View {
         Group {
@@ -53,6 +55,10 @@ struct PostDetailView: View {
                     if let flag = gist.toneFlag, flag != "ok" {
                         Text("tone: \(flag)").font(.caption).foregroundStyle(.secondary)
                     }
+                    NavigationLink("See how this evolved") {
+                        GistEvolutionView(postId: postId)
+                    }
+                    .font(.subheadline)
                 } else {
                     Text("No AI gist yet — showing the raw replies below. (The gist generates server-side once the generate-gist function runs.)")
                         .font(.footnote)
@@ -94,6 +100,24 @@ struct PostDetailView: View {
 
             if let error = vm.error {
                 Text(error).foregroundStyle(.red)
+            }
+        }
+        .toolbar {
+            if let gist = vm.gist {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingShare = true
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel("Share gist")
+                    .opacity(gist.verdict == nil && gist.body.isEmpty ? 0 : 1)
+                }
+            }
+        }
+        .sheet(isPresented: $showingShare) {
+            if let gist = vm.gist {
+                GistShareView(verdict: gist.verdict ?? "Your gist", text: gist.body, prompt: promptText)
             }
         }
     }

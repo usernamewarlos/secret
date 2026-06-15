@@ -79,4 +79,15 @@ final class ConnectionsViewModel {
             self.error = error.localizedDescription
         }
     }
+
+    /// Block also revokes the relationship (and their replies on my posts).
+    func block(_ connectedUserId: UUID) async {
+        do {
+            try await connections.block(userId: connectedUserId)
+            try? await connections.revoke(connectedUserId: connectedUserId)
+            await load()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
 }

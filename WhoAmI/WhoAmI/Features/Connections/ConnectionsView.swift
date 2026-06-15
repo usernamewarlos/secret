@@ -53,7 +53,8 @@ struct ConnectionsView: View {
                         let next: ConnectionRole = row.connection.role == .replier ? .viewer : .replier
                         Task { await vm.setRole(connectionId: row.connection.id, role: next) }
                     },
-                    onRevoke: { Task { await vm.revoke(row.connection.connectedUserId) } }
+                    onRevoke: { Task { await vm.revoke(row.connection.connectedUserId) } },
+                    onBlock: { Task { await vm.block(row.connection.connectedUserId) } }
                 )
             }
             if let error = vm.error {
@@ -67,6 +68,7 @@ private struct ConnectionRowView: View {
     let row: ConnectionsViewModel.Row
     var onToggleRole: () -> Void
     var onRevoke: () -> Void
+    var onBlock: () -> Void
 
     var body: some View {
         NavigationLink {
@@ -90,6 +92,9 @@ private struct ConnectionRowView: View {
             Button("Revoke", role: .destructive, action: onRevoke)
             Button(row.connection.role == .replier ? "Make viewer" : "Make replier", action: onToggleRole)
                 .tint(.blue)
+        }
+        .swipeActions(edge: .leading) {
+            Button("Block", action: onBlock).tint(.red)
         }
     }
 }

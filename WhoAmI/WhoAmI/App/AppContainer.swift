@@ -14,6 +14,7 @@ final class AppContainer {
     let posts: PostsService
     let replies: RepliesService
     let gists: GistService
+    let notifications: NotificationService
     let session: SessionStore
 
     init() {
@@ -26,6 +27,7 @@ final class AppContainer {
         self.posts = LivePostsService()
         self.replies = LiveRepliesService()
         self.gists = LiveGistService()
+        self.notifications = LocalNotificationService()
         self.session = SessionStore(auth: auth, profile: profile)
     }
 }
