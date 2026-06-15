@@ -8,7 +8,7 @@ struct OnboardingView: View {
     var body: some View {
         NavigationStack {
             if passedAgeGate {
-                PhoneVerifyView()
+                EmailAuthView()
             } else {
                 AgeGateView(onPass: { passedAgeGate = true })
             }

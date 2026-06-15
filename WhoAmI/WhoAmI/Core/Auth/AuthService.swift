@@ -12,6 +12,8 @@ enum AuthPhase: Equatable {
 /// Auth boundary. Phone (SMS OTP) is the primary verification (PRODUCT.md §6.1).
 protocol AuthService: Sendable {
     var currentUserID: UUID? { get }
+    func signUp(email: String, password: String) async throws
+    func signIn(email: String, password: String) async throws
     func sendOTP(phone: String) async throws
     func verifyOTP(phone: String, code: String) async throws
     func signOut() async throws
@@ -27,6 +29,14 @@ final class LiveAuthService: AuthService {
     }
 
     var currentUserID: UUID? { client.auth.currentUser?.id }
+
+    func signUp(email: String, password: String) async throws {
+        try await client.auth.signUp(email: email, password: password)
+    }
+
+    func signIn(email: String, password: String) async throws {
+        try await client.auth.signIn(email: email, password: password)
+    }
 
     func sendOTP(phone: String) async throws {
         try await client.auth.signInWithOTP(phone: phone)
