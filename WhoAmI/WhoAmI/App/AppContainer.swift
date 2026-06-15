@@ -10,6 +10,10 @@ final class AppContainer {
     let auth: AuthService
     let profile: ProfileService
     let connections: ConnectionsService
+    let prompts: PromptsService
+    let posts: PostsService
+    let replies: RepliesService
+    let gists: GistService
     let session: SessionStore
 
     init() {
@@ -18,6 +22,10 @@ final class AppContainer {
         self.auth = auth
         self.profile = profile
         self.connections = LiveConnectionsService()
+        self.prompts = LivePromptsService()
+        self.posts = LivePostsService()
+        self.replies = LiveRepliesService()
+        self.gists = LiveGistService()
         self.session = SessionStore(auth: auth, profile: profile)
     }
 }

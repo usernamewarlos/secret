@@ -13,7 +13,7 @@ struct RootView: View {
         case .needsProfile:
             ProfileSetupView()
         case .signedIn:
-            HomeView()
+            MainTabView()
         }
     }
 }

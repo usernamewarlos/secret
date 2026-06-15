@@ -3,6 +3,7 @@ import Supabase
 
 protocol ProfileService: Sendable {
     func fetch(id: UUID) async throws -> UserProfile?
+    func fetchMany(ids: [UUID]) async throws -> [UserProfile]
     func upsert(id: UUID, displayName: String, bio: String?, igHandle: String?) async throws
 }
 
@@ -22,6 +23,16 @@ final class LiveProfileService: ProfileService {
             .execute()
             .value
         return rows.first
+    }
+
+    func fetchMany(ids: [UUID]) async throws -> [UserProfile] {
+        guard !ids.isEmpty else { return [] }
+        return try await client
+            .from("users")
+            .select()
+            .in("id", values: ids.map(\.uuidString))
+            .execute()
+            .value
     }
 
     func upsert(id: UUID, displayName: String, bio: String?, igHandle: String?) async throws {
