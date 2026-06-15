@@ -1,5 +1,7 @@
 import SwiftUI
 
+/// Doubles as the owner's "curate" view: the owner can hide public replies, and any author
+/// can reveal/re-hide their own reply. Private replies show only as named, locked markers.
 struct PostDetailView: View {
     let postId: UUID
     let promptText: String
@@ -20,7 +22,14 @@ struct PostDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if vm == nil {
-                let model = PostDetailViewModel(postId: postId, isOwner: isOwner, gists: container.gists, replies: container.replies)
+                let model = PostDetailViewModel(
+                    postId: postId,
+                    isOwner: isOwner,
+                    gists: container.gists,
+                    replies: container.replies,
+                    profile: container.profile,
+                    myId: container.auth.currentUserID
+                )
                 vm = model
                 Task { await model.load() }
             }
@@ -51,19 +60,35 @@ struct PostDetailView: View {
                 }
             }
 
-            Section("Replies (\(vm.count))") {
-                ForEach(vm.publicReplies) { reply in
-                    ReplyRowView(reply: reply, isOwner: vm.isOwner) {
-                        Task { await vm.ownerPrivatize(reply.id) }
+            if let mine = vm.myReply {
+                Section("Your reply") {
+                    Text(mine.body)
+                    if mine.isPrivate {
+                        Label("Private — only you can read this.", systemImage: "lock.fill")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Button("Reveal to everyone") { Task { await vm.setMyPrivacy(false) } }
+                    } else {
+                        Button("Make private") { Task { await vm.setMyPrivacy(true) } }
                     }
                 }
-                ForEach(vm.markers) { marker in
+            }
+
+            Section("Replies (\(vm.count))") {
+                ForEach(vm.otherPublicReplies) { reply in
+                    ReplyRowView(
+                        authorName: vm.name(for: reply.authorId),
+                        reply: reply,
+                        canHide: vm.isOwner,
+                        onHide: { Task { await vm.ownerPrivatize(reply.id) } }
+                    )
+                }
+                ForEach(vm.visibleMarkers) { marker in
                     Label("\(marker.displayName ?? "Someone") left a private reply", systemImage: "lock.fill")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                if vm.publicReplies.isEmpty && vm.markers.isEmpty && !vm.loading {
-                    Text("No replies to show yet.").font(.footnote).foregroundStyle(.secondary)
+                if vm.otherPublicReplies.isEmpty && vm.visibleMarkers.isEmpty && !vm.loading {
+                    Text("No other replies to show yet.").font(.footnote).foregroundStyle(.secondary)
                 }
             }
 

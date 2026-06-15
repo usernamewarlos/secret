@@ -1,17 +1,24 @@
 import SwiftUI
 
-/// Phase 2 renders the body; Phase 4 adds author attribution + author-reveal.
+/// An attributed public reply. The owner can hide (privatize) it; only the author can ever
+/// reveal it again (handled in the author's "Your reply" section).
 struct ReplyRowView: View {
+    let authorName: String
     let reply: Reply
-    let isOwner: Bool
-    var onOwnerPrivatize: () -> Void
+    let canHide: Bool
+    var onHide: () -> Void
 
     var body: some View {
-        Text(reply.body)
-            .swipeActions(edge: .trailing) {
-                if isOwner {
-                    Button("Hide", role: .destructive, action: onOwnerPrivatize)
-                }
+        VStack(alignment: .leading, spacing: 3) {
+            Text(authorName)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(reply.body)
+        }
+        .swipeActions(edge: .trailing) {
+            if canHide {
+                Button("Hide", role: .destructive, action: onHide)
             }
+        }
     }
 }
