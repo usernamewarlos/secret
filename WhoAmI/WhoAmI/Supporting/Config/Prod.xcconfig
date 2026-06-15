@@ -1,3 +1,3 @@
 // Production build config. See Dev.xcconfig for notes on the anon key.
-SUPABASE_URL = your-project.supabase.co
-SUPABASE_ANON_KEY = your-anon-public-key
+SUPABASE_URL = ttwxeagmuiddiulmncdt.supabase.co
+SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0d3hlYWdtdWlkZGl1bG1uY2R0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1NDk3NjMsImV4cCI6MjA5NzEyNTc2M30.MmGOVDAha15ZX1a8LH_BdMjrZUZ6IEZJobNoLze_lCc
