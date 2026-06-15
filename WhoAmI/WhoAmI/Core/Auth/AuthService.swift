@@ -1,0 +1,54 @@
+import Foundation
+import Supabase
+
+/// Routing phases derived from auth + profile completeness.
+enum AuthPhase: Equatable {
+    case loading
+    case signedOut
+    case needsProfile
+    case signedIn
+}
+
+/// Auth boundary. Phone (SMS OTP) is the primary verification (PRODUCT.md §6.1).
+protocol AuthService: Sendable {
+    var currentUserID: UUID? { get }
+    func sendOTP(phone: String) async throws
+    func verifyOTP(phone: String, code: String) async throws
+    func signOut() async throws
+    /// Emits whenever the underlying auth state changes (sign in / out / token refresh).
+    func authChanges() -> AsyncStream<Void>
+}
+
+final class LiveAuthService: AuthService {
+    private let client: SupabaseClient
+
+    init(client: SupabaseClient = SupabaseClientProvider.shared) {
+        self.client = client
+    }
+
+    var currentUserID: UUID? { client.auth.currentUser?.id }
+
+    func sendOTP(phone: String) async throws {
+        try await client.auth.signInWithOTP(phone: phone)
+    }
+
+    func verifyOTP(phone: String, code: String) async throws {
+        try await client.auth.verifyOTP(phone: phone, token: code, type: .sms)
+    }
+
+    func signOut() async throws {
+        try await client.auth.signOut()
+    }
+
+    func authChanges() -> AsyncStream<Void> {
+        AsyncStream { continuation in
+            let task = Task {
+                for await _ in client.auth.authStateChanges {
+                    continuation.yield(())
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+}

@@ -1,0 +1,149 @@
+# Who Am I — SCAFFOLD.md (Project Scaffold & Setup)
+
+> Read `README.md` first for orientation and the hard constraints, `PRODUCT.md` for product behavior, and `GIST.md` for AI generation. This file is the **build-setup contract**: the tech stack, the MVVM architecture, the Supabase + auth integration, the Xcode project setup, and how the codebase maps to the PRD's phases. `STRUCTURE.md` is the companion that defines *where every file lives*.
+
+---
+
+## 0. Platform decision (supersedes the README's web default)
+
+The app is a **native iOS app in SwiftUI**, not the Next.js web app the README floated as a starting default. The README said "override if you prefer" — this is that override. The backend stays **Supabase**.
+
+Rationale: this is a phone-first social product — daily push ritual, share-to-stories, camera, tight gesture-driven curation. Native iOS gives the best version of the daily-prompt + share loop, and Supabase still does all the privacy-critical work at the data layer. Web/Android can follow later against the *same* Supabase backend.
+
+---
+
+## 1. Stack
+
+| Layer | Choice |
+|---|---|
+| Client | SwiftUI, **iOS 17.0+** deployment target, Swift Concurrency (`async/await`), Observation framework (`@Observable`) |
+| Architecture | **MVVM** + a thin **Service/Repository** layer |
+| Backend / DB / auth / storage | **Supabase** — Postgres + Row Level Security + Auth + Realtime + Storage |
+| iOS ↔ Supabase | **supabase-swift** SDK (Swift Package Manager) |
+| Server logic | **Supabase Edge Functions** (Deno/TypeScript) — daily prompt cron, gist generation, regeneration, safety check |
+| Gist AI | **Anthropic API (Claude)**, called **only** from Edge Functions — the key never ships in the app |
+| Scheduling | `pg_cron` / Supabase scheduled functions |
+| Tooling | Latest stable Xcode |
+
+iOS 17 is the floor so we can use `@Observable` and modern SwiftUI navigation; target the latest SDK.
+
+---
+
+## 2. The MVVM architecture
+
+Four layers and **one dependency rule**.
+
+- **Model** — `Codable` structs mirroring DB rows (`User`, `Connection`, `Prompt`, `Post`, `Reply`, `Gist`, `GistVersion`). Pure data, no logic.
+- **View** — SwiftUI, deliberately dumb. Binds to a ViewModel, renders its state, sends user intents up. **No networking, no Supabase, no business logic.**
+- **ViewModel** — one per screen/feature, `@Observable` and `@MainActor`. Holds view state (idle/loading/loaded/failed), calls Services, maps Models → display state. Knows nothing about SwiftUI views or Supabase.
+- **Service / Repository** — the **only** layer that touches `SupabaseClient`. One per domain (`AuthService`, `ConnectionsService`, `PromptsService`, `PostsService`, `RepliesService`, `GistService`, `ProfileService`). Returns Models, throws typed errors.
+
+```
+View  ──▶  ViewModel  ──▶  Service  ──▶  SupabaseClient
+  ▲            │              │
+  └─ state ────┘              └─ Models flow back up
+```
+
+**The rule (one direction, no skipping):** `View → ViewModel → Service → SupabaseClient`. A View **never** imports Supabase. This keeps every read/write — and therefore every place RLS and the privacy model are touched — in one auditable layer. Given that "private = author-only" and "blind accumulation" are load-bearing, this is not optional.
+
+- **DI:** constructor-inject **protocol-typed** Services into ViewModels so they mock cleanly in tests. A lightweight `AppContainer` (passed via the SwiftUI environment) holds the live Services.
+- **State:** prefer a small generic, e.g. `enum ViewState<T> { case idle, loading, loaded(T), failed(Error) }`, exposed from the `@Observable` ViewModel. All IO is `async/await`; UI mutations on the main actor.
+
+---
+
+## 3. Xcode project setup (step by step)
+
+1. **New project → App** → interface **SwiftUI**, language **Swift**, name **`WhoAmI`**, organization id `com.<org>.whoami`. Save it into the repo's `WhoAmI/` folder (see `STRUCTURE.md`).
+2. **Deployment target: iOS 17.0.** SwiftUI app lifecycle (`@main struct WhoAmIApp: App`); no storyboard.
+3. **Add SPM dependencies** (§4).
+4. **Create the group structure** mirroring `STRUCTURE.md` (`App/`, `Core/`, `Models/`, `Features/`, `DesignSystem/`, `Resources/`, `Supporting/`). Use folder references so Xcode groups == disk folders.
+5. **Configuration via `.xcconfig`** (§5): Debug/Release × per-environment Supabase URL + anon key. Never hardcode; never commit real secrets.
+6. **`Info.plist`:** register a **URL scheme** for the Supabase auth redirect (OTP / OAuth callback deep link); add photo-picker usage strings (profile photo); add Push Notifications background mode in Phase 5.
+7. **Schemes:** `WhoAmI-Dev` and `WhoAmI-Prod`, each wired to its `.xcconfig` / Supabase project.
+8. **Capabilities:** Push Notifications (Phase 5), Associated Domains (deep links / share-card links), optionally Sign in with Apple.
+9. **Targets:** app + `WhoAmITests` (unit) + `WhoAmIUITests` (UI).
+
+---
+
+## 4. Swift package dependencies (SPM)
+
+- **supabase-swift** — `https://github.com/supabase/supabase-swift` — provides `Auth`, `PostgREST`, `Realtime`, `Storage`, `Functions` (and the umbrella `Supabase` product).
+- Keep the dependency list minimal; add only what a feature needs.
+- **No Anthropic SDK in the app.** Gist generation is server-side only (§8).
+
+---
+
+## 5. Configuration & secrets
+
+- **Safe to ship in the client:** the Supabase **URL** and **anon/publishable key** (the anon key is gated by RLS). Still keep them in `Supporting/Config/Dev.xcconfig` / `Prod.xcconfig` (not hardcoded), surfaced at runtime via `Info.plist` build-setting substitution. Commit `*.xcconfig.example` only.
+- **Secrets — never in the repo or the app:** the Supabase **service_role** key and the **Anthropic API key**. They live **only** in Supabase Edge Function environment variables (`supabase secrets set …`). This is README hard constraint #2 in practice.
+- **`.gitignore`** real `.xcconfig`s, `.env`, `*.xcuserstate`, `build/`, `DerivedData/`, `.DS_Store`.
+
+---
+
+## 6. Auth & onboarding (Phase 1)
+
+- **Supabase Auth** via supabase-swift. **Primary verification: phone (SMS OTP)**; email also supported (`PRODUCT.md` §6.1).
+- **18+ age gate (hard):** a neutral **date-of-birth** screen *before* the account is usable. Block under-18; store the attestation (`users.dob` / `age_verified`). Non-negotiable — README hard constraint #1.
+- **Onboarding flow:** AgeGate → Verify (OTP) → ProfileSetup (name / photo / bio) → AddFriends / invite. The invite step is the most important screen — the app is dead without repliers.
+- **Session:** the SDK persists the session in the Keychain. An `AuthService` publishes auth state; the **root router** decides the destination:
+  - no session → Onboarding
+  - session but profile incomplete → finish onboarding
+  - else → main tab scaffold
+- **Instagram** is a *display-only* handle the user types in. Do **not** integrate any IG API (the Basic Display API is gone — `PRODUCT.md` §6.1).
+
+---
+
+## 7. Data layer & RLS posture
+
+- **Models** are `Codable`; map snake_case ↔ camelCase via `CodingKeys` or a key-decoding strategy.
+- Services query **PostgREST** through the SDK. **RLS is the source of truth** for visibility — blind accumulation, `private = author-only`, and `graduated + public` reads are all enforced in Postgres policies (`PRODUCT.md` §8/§10). The app **does not re-implement** these rules; it trusts RLS and codes the UI defensively (never request a private body; render `🔒 [name] left a private reply` from the author + flag projection alone).
+- **Counts** (the `8/10` counter) come from aggregate RPCs / views that expose numbers without leaking rows.
+- **Realtime:** subscribe to a post's reply count / status for the live counter and the graduation moment (optional, but it's exactly the dopamine spike the PRD wants).
+- **Service surface (sketch):** `RepliesService.submit(postId:body:isPrivate:)`, `RepliesService.setPrivacy(replyId:isPrivate:)` (author), `PostsService.counter(postId:)`, `ProfileService.archive(userId:)`, `GistService.current(postId:)` / `.versions(postId:)`, `ConnectionsService.setRole(_:)` / `.revoke(_:)`.
+
+---
+
+## 8. Backend (Supabase) — what runs server-side
+
+Not Swift; it lives in `supabase/` (see `STRUCTURE.md`). Summarized here because the app depends on it:
+
+- **`migrations/`** — the schema + **RLS policies** (`PRODUCT.md` §8/§10). **Author the RLS first** — it is the privacy guarantee, not a UI nicety.
+- **`functions/`** (Edge, Deno/TS):
+  - **`publish-daily-prompt`** — cron; selects the day's prompt from the seeded deck and creates the one global prompt row.
+  - **`generate-gist`** — runs on graduation; executes the `GIST.md` §12 prompt against the Anthropic API, runs the §15 post-generation safety check, writes an append-only `gist_versions` row. Fed **public replies only**.
+  - **`regenerate-gists`** — cron; batched accretion regeneration per `GIST.md` §13/§14 (the +N / ≥25% / revoke triggers, 24h cap).
+  - Graduation can be a Postgres function/trigger that flags eligible posts; the Edge Function does the generation.
+- **Secrets** (Anthropic key, service_role) live in Edge Function env only.
+- **`pg_cron`** schedules the daily publish + the regeneration sweep.
+
+---
+
+## 9. Codebase ↔ PRD phase mapping
+
+| Phase (`PRODUCT.md` §13) | iOS (`WhoAmI/`) | Backend (`supabase/`) |
+|---|---|---|
+| **1 — Skeleton + identity** | `App/`, `Core/Supabase`, `Core/Auth`, `Models/`, `Features/Onboarding`, `Features/Connections` | migrations: `users`, `connections` + RLS; phone OTP |
+| **2 — Daily loop (no AI)** | `Features/Today`, `Features/Profile` (counters, blind), Prompts/Posts/Replies services | `publish-daily-prompt`; seed deck; placeholder "gist" = list public replies |
+| **3 — The gist (AI)** | `Features/Gist`, `GistService` (read) | `generate-gist` + `regenerate-gists` + safety check |
+| **4 — Curation + intrigue** | `Features/Curate` (privatize), named private items + attributed see-more in `Features/Profile` | verify RLS: private bodies author-only |
+| **5 — Growth** | `Features/Share` (share-cards), push, evolution timeline, nudges | notification fan-out, batched |
+
+---
+
+## 10. Testing
+
+- **Unit-test ViewModels** against mocked (protocol) Services — this is the payoff of the DI rule in §2.
+- Test the **graduation threshold math** (`clamp(ceil(0.5 × repliers), 3, 10)`), the tone/state mapping, and the privacy-gating UI logic.
+- **Edge Functions** are tested in the Supabase project; gist tone/safety is validated per `GIST.md` (§15, §17).
+- **UI test** the onboarding age gate and the core-loop happy path.
+
+---
+
+## 11. Conventions (quick reference)
+
+- One public type per file; **filename = type name**.
+- Suffixes: `…View`, `…ViewModel`, `…Service`; models are plain nouns.
+- `@MainActor` on ViewModels; `async/await` for IO; **typed errors** (`AppError`), no `try!`.
+- **No business logic in Views. No Supabase outside Services.** No force-unwraps in app code.
+- Disk folders mirror Xcode groups (`STRUCTURE.md`).

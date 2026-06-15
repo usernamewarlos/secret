@@ -1,0 +1,32 @@
+# --- macOS ---
+.DS_Store
+
+# --- Xcode ---
+build/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+xcuserdata/
+*.moved-aside
+
+# --- XcodeGen output (the .xcodeproj is generated; run `xcodegen generate`) ---
+*.xcodeproj
+
+# --- Swift Package Manager ---
+.build/
+.swiftpm/
+
+# --- Local-only / secret xcconfig ---
+# NOTE: Dev.xcconfig / Prod.xcconfig ARE committed — the Supabase anon key is publishable
+# and gated by RLS (see docs/SCAFFOLD.md §5). Real server secrets (service_role,
+# ANTHROPIC_API_KEY) live ONLY in Supabase Edge Function env, never in this repo.
+*.local.xcconfig
+
+# --- Supabase ---
+supabase/.temp/
+supabase/.branches/
+.env
+.env.*
+
+# --- misc tooling ---
+node_modules/

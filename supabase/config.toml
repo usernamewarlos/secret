@@ -1,0 +1,12 @@
+# Supabase CLI config — Who Am I
+# Local dev: `supabase start`. Deploy functions: `supabase functions deploy <name>`.
+project_id = "who-am-i"
+
+[functions.publish-daily-prompt]
+verify_jwt = false   # invoked by the scheduler (service role)
+
+[functions.generate-gist]
+verify_jwt = false   # invoked server-to-server on graduation
+
+[functions.regenerate-gists]
+verify_jwt = false   # invoked by the scheduler (service role)
