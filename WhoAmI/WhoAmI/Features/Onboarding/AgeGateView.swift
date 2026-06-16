@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct AgeGateView: View {
-    let onPass: () -> Void
+    /// Called once the user clears the 18+ gate, surfacing the chosen DOB so it can be
+    /// threaded into profile setup (`age_verified` then reflects a real gate pass).
+    let onPass: (_ dob: Date) -> Void
     @State private var vm = AgeGateViewModel()
 
     var body: some View {
@@ -30,7 +32,7 @@ struct AgeGateView: View {
 
             PrimaryButton(title: "Continue") {
                 if vm.isEligible() {
-                    onPass()
+                    onPass(vm.dob)
                 } else {
                     vm.error = "You must be 18 or older to use Who Am I."
                 }

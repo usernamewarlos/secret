@@ -43,6 +43,12 @@ struct AnswerView: View {
             Section("Your answer") {
                 TextField("Say something true and funny…", text: $vm.body, axis: .vertical)
                     .lineLimit(3...8)
+                HStack {
+                    Spacer()
+                    Text("\(vm.characterCount)/\(AnswerViewModel.maxLength)")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(vm.isOverLimit ? .red : .secondary)
+                }
                 Toggle("Private — only you can read it", isOn: $vm.isPrivate)
             }
             Section {
@@ -55,7 +61,7 @@ struct AnswerView: View {
             if let error = vm.error {
                 Text(error).foregroundStyle(.red)
             }
-            PrimaryButton(title: vm.busy ? "Sending…" : "Submit", enabled: !vm.busy) {
+            PrimaryButton(title: vm.busy ? "Sending…" : "Submit", enabled: vm.canSubmit) {
                 Task {
                     if await vm.submit() {
                         onSubmitted()

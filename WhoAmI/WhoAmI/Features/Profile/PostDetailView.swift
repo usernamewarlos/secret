@@ -52,6 +52,9 @@ struct PostDetailView: View {
                         Text(verdict).font(.title3.bold())
                     }
                     Text(gist.body)
+                    Text("An AI take on what your friends said — in their words, in their eyes.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     if let flag = gist.toneFlag, flag != "ok" {
                         Text("tone: \(flag)").font(.caption).foregroundStyle(.secondary)
                     }

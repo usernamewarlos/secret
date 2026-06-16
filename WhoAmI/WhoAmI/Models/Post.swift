@@ -14,6 +14,8 @@ struct Post: Codable, Identifiable, Sendable {
     var status: PostStatus
     var threshold: Int
     var graduatedAt: String?
+    /// Effective per-post tone the gist generator calibrates to: wholesome | playful | social | spicy.
+    var spiceLevel: String
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -22,5 +24,6 @@ struct Post: Codable, Identifiable, Sendable {
         case status
         case threshold
         case graduatedAt = "graduated_at"
+        case spiceLevel = "spice_level"
     }
 }

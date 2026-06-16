@@ -32,6 +32,10 @@ struct GistShareCard: View {
             Text(prompt)
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.75))
+
+            Text("who your friends say you are")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.6))
         }
         .padding(28)
         .frame(width: 360, height: 480, alignment: .leading)

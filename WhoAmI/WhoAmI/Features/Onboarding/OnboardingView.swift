@@ -10,7 +10,12 @@ struct OnboardingView: View {
             if passedAgeGate {
                 EmailAuthView()
             } else {
-                AgeGateView(onPass: { passedAgeGate = true })
+                AgeGateView(onPass: { dob in
+                    // Park the verified DOB so ProfileSetupView (instantiated separately by
+                    // RootView once auth flips) can persist it with age_verified = true.
+                    OnboardingDraft.pendingDOB = OnboardingDraft.dobString(from: dob)
+                    passedAgeGate = true
+                })
             }
         }
     }

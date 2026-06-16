@@ -3,6 +3,11 @@ import Supabase
 
 protocol RepliesService: Sendable {
     func submit(ownerId: UUID, promptId: UUID, body: String, isPrivate: Bool) async throws
+    /// Owner opens a prompt on their own profile at a chosen level (capped at the prompt's tone).
+    /// Use this to let a `social` owner opt into a `spicy` prompt, or to dial any prompt down.
+    func openPost(ownerId: UUID, promptId: UUID, level: String) async throws
+    /// Owner adjusts an already-open post's level (capped at the prompt's tone).
+    func setPostSpice(postId: UUID, level: String) async throws
     /// Public, graduated replies (or the caller's own) — RLS enforces this.
     func publicReplies(postId: UUID) async throws -> [Reply]
     func myReply(postId: UUID) async throws -> Reply?
@@ -33,12 +38,38 @@ final class LiveRepliesService: RepliesService {
         let p_private: Bool
     }
 
+    private struct OpenPostParams: Encodable {
+        let p_owner: String
+        let p_prompt: String
+        let p_level: String
+    }
+
+    private struct SetPostSpiceParams: Encodable {
+        let p_post: String
+        let p_level: String
+    }
+
     func submit(ownerId: UUID, promptId: UUID, body: String, isPrivate: Bool) async throws {
         try await client.rpc("submit_reply", params: SubmitParams(
             p_owner: ownerId.uuidString,
             p_prompt: promptId.uuidString,
             p_body: body,
             p_is_private: isPrivate
+        )).execute()
+    }
+
+    func openPost(ownerId: UUID, promptId: UUID, level: String) async throws {
+        try await client.rpc("open_post", params: OpenPostParams(
+            p_owner: ownerId.uuidString,
+            p_prompt: promptId.uuidString,
+            p_level: level
+        )).execute()
+    }
+
+    func setPostSpice(postId: UUID, level: String) async throws {
+        try await client.rpc("set_post_spice", params: SetPostSpiceParams(
+            p_post: postId.uuidString,
+            p_level: level
         )).execute()
     }
 

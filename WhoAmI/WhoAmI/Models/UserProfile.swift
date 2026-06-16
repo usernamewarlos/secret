@@ -10,6 +10,8 @@ struct UserProfile: Codable, Identifiable, Sendable {
     var ageVerified: Bool
     var verifiedPhone: Bool
     var igHandle: String?
+    /// The owner's standing comfort ceiling: wholesome | playful | social | spicy.
+    var defaultSpiceLevel: String?
     var createdAt: String?
 
     enum CodingKeys: String, CodingKey {
@@ -21,6 +23,7 @@ struct UserProfile: Codable, Identifiable, Sendable {
         case ageVerified = "age_verified"
         case verifiedPhone = "verified_phone"
         case igHandle = "ig_handle"
+        case defaultSpiceLevel = "default_spice_level"
         case createdAt = "created_at"
     }
 }
