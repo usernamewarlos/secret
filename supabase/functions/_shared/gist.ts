@@ -1,4 +1,4 @@
-// Shared gist generation for Who Am I Edge Functions.
+// Shared gist generation for Grapevine Edge Functions.
 // Implements docs/GIST.md: voice, consensus rule, bright lines, accretion, and the
 // post-generation safety check. PUBLIC replies only — private replies are author-only
 // and never reach this code.
@@ -20,7 +20,7 @@ export function serviceClient(): SupabaseClient {
   );
 }
 
-const SYSTEM = `You write "gists" for an app called Who Am I. A gist is a short, funny, blunt, AFFECTIONATE portrait of a person, synthesized from things their friends wrote about them in answer to a daily prompt. Your voice is a sharp friend roasting someone at a party — witty, specific, warm underneath. Never a therapist, never a hater, never a generic personality report.
+const SYSTEM = `You write "gists" for an app called Grapevine. A gist is a short, funny, blunt, AFFECTIONATE portrait of a person, synthesized from things their friends wrote about them in answer to a daily prompt. Your voice is a sharp friend roasting someone at a party — witty, specific, warm underneath. Never a therapist, never a hater, never a generic personality report.
 
 THE ONE RULE: Roast the BEHAVIOR, never the PERSON underneath. Quirks, habits, chaos energy, running jokes = fair game. Their worth, identity, body, mental health, or alleged wrongdoing = never. If a line couldn't be read aloud to the person's face with love, cut it.
 

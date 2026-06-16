@@ -11,7 +11,7 @@ struct AgeGateView: View {
             Spacer()
             Text("How old are you?")
                 .font(.largeTitle.bold())
-            Text("Who Am I is for ages 18 and up.")
+            Text("Grapevine is for ages 18 and up.")
                 .foregroundStyle(.secondary)
 
             DatePicker(
@@ -34,7 +34,7 @@ struct AgeGateView: View {
                 if vm.isEligible() {
                     onPass(vm.dob)
                 } else {
-                    vm.error = "You must be 18 or older to use Who Am I."
+                    vm.error = "You must be 18 or older to use Grapevine."
                 }
             }
             Spacer()

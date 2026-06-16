@@ -9,7 +9,7 @@ struct GistShareCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("WHO AM I")
+            Text("GRAPEVINE")
                 .font(.caption.weight(.black))
                 .tracking(3)
                 .foregroundStyle(.white.opacity(0.85))
