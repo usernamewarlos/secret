@@ -9,7 +9,7 @@ struct GistShareCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("WHO AM I")
+            Text("GRAPEVINE")
                 .font(.caption.weight(.black))
                 .tracking(3)
                 .foregroundStyle(.white.opacity(0.85))
@@ -32,6 +32,10 @@ struct GistShareCard: View {
             Text(prompt)
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.75))
+
+            Text("who your friends say you are")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.6))
         }
         .padding(28)
         .frame(width: 360, height: 480, alignment: .leading)

@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 struct EmailAuthView: View {
@@ -45,6 +46,43 @@ struct EmailAuthView: View {
             ) {
                 Task { await vm.submit() }
             }
+
+            HStack {
+                VStack { Divider() }
+                Text("or").font(.footnote).foregroundStyle(.secondary)
+                VStack { Divider() }
+            }
+            .padding(.vertical, 4)
+
+            // Sign in with Apple.
+            // TODO: Running this on-device/simulator requires the "Sign in with Apple"
+            // capability (com.apple.developer.applesignin entitlement), which needs a paid
+            // Apple Developer Team. The entitlement is intentionally NOT added to project.yml.
+            SignInWithAppleButton(
+                .signIn,
+                onRequest: { request in
+                    viewModel.configureAppleRequest(request)
+                },
+                onCompletion: { result in
+                    Task { await viewModel.handleAppleCompletion(result) }
+                }
+            )
+            .signInWithAppleButtonStyle(.black)
+            .frame(height: 48)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
+            .disabled(vm.busy)
+
+            Button {
+                Task { await viewModel.signInWithGoogle() }
+            } label: {
+                Text("Continue with Google")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+            }
+            .buttonStyle(.bordered)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius))
+            .disabled(vm.busy)
 
             if let info = vm.info {
                 Text(info).font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)

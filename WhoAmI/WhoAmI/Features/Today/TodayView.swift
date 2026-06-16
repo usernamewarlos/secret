@@ -21,7 +21,9 @@ struct TodayView: View {
                         prompts: container.prompts,
                         connections: container.connections,
                         posts: container.posts,
-                        replies: container.replies
+                        replies: container.replies,
+                        profile: container.profile,
+                        auth: container.auth
                     )
                     vm = model
                     Task { await model.load() }
@@ -39,10 +41,11 @@ struct TodayView: View {
     }
 
     @ViewBuilder
-    private func content(_ vm: TodayViewModel) -> some View {
+    private func content(_ viewModel: TodayViewModel) -> some View {
+        @Bindable var vm = viewModel
         if let prompt = vm.prompt {
             List {
-                Section {
+                Section("Today — about you") {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(prompt.tone.rawValue.capitalized)
                             .font(.caption.weight(.semibold))
@@ -51,9 +54,37 @@ struct TodayView: View {
                             .font(.title3.bold())
                     }
                     .padding(.vertical, 4)
+
+                    Picker("Open at", selection: spiceBinding(vm)) {
+                        ForEach(vm.availableChoices) { choice in
+                            Text(choice.label).tag(choice)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .disabled(vm.spiceBusy)
+
+                    if vm.requiresOptIn {
+                        Text("This prompt is spicier than your comfort level — it stays closed until you opt in by picking a level.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else if vm.ownerChoice == .skip {
+                        Text("Pick a level to let people answer this about you today.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if vm.spiceBusy {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                            Text("Updating…").font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
+                    if let spiceError = vm.spiceError {
+                        Text(spiceError).font(.footnote).foregroundStyle(.red)
+                    }
                 }
 
-                Section("Answer about") {
+                Section("Answer about others") {
                     if vm.targets.isEmpty {
                         Text("No one has made you a replier yet. Add people in the People tab — they decide who can write about them.")
                             .font(.footnote)
@@ -93,5 +124,15 @@ struct TodayView: View {
                 description: Text("Today's prompt hasn't been published yet.")
             )
         }
+    }
+
+    /// Binding that applies the chosen spice level (opening the owner's post) on selection.
+    private func spiceBinding(_ vm: TodayViewModel) -> Binding<TodayViewModel.SpiceChoice> {
+        Binding(
+            get: { vm.ownerChoice },
+            set: { choice in
+                Task { await vm.applySpice(choice) }
+            }
+        )
     }
 }

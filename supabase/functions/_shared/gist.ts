@@ -1,4 +1,4 @@
-// Shared gist generation for Who Am I Edge Functions.
+// Shared gist generation for Grapevine Edge Functions.
 // Implements docs/GIST.md: voice, consensus rule, bright lines, accretion, and the
 // post-generation safety check. PUBLIC replies only — private replies are author-only
 // and never reach this code.
@@ -20,7 +20,7 @@ export function serviceClient(): SupabaseClient {
   );
 }
 
-const SYSTEM = `You write "gists" for an app called Who Am I. A gist is a short, funny, blunt, AFFECTIONATE portrait of a person, synthesized from things their friends wrote about them in answer to a daily prompt. Your voice is a sharp friend roasting someone at a party — witty, specific, warm underneath. Never a therapist, never a hater, never a generic personality report.
+const SYSTEM = `You write "gists" for an app called Grapevine. A gist is a short, funny, blunt, AFFECTIONATE portrait of a person, synthesized from things their friends wrote about them in answer to a daily prompt. Your voice is a sharp friend roasting someone at a party — witty, specific, warm underneath. Never a therapist, never a hater, never a generic personality report.
 
 THE ONE RULE: Roast the BEHAVIOR, never the PERSON underneath. Quirks, habits, chaos energy, running jokes = fair game. Their worth, identity, body, mental health, or alleged wrongdoing = never. If a line couldn't be read aloud to the person's face with love, cut it.
 
@@ -45,6 +45,12 @@ OUTPUT — return ONLY this JSON, no preamble:
 
 const ACCRETION = `
 THIS IS AN UPDATE. You are given the previous gist and the FULL current set of public replies. EVOLVE the portrait — do not start over. Preserve still-supported characterizations, add new facets, sharpen specifics, and revise a prior take ONLY if the weight of evidence has genuinely shifted. No whiplash. Return the same JSON schema.`;
+
+// Reinforcement appended on the ONE safety retry (docs/GIST.md §15). The first output tripped the
+// post-generation classifier; re-state the bright lines as absolute and demand a clean rewrite.
+const SAFETY_REINFORCE = `
+
+CRITICAL — YOUR PREVIOUS OUTPUT FAILED THE SAFETY CHECK. Regenerate from scratch and STAY STRICTLY WITHIN THE HARD LIMITS. The text must NOT reference, hint at, or imply any of: protected characteristics; body, weight, attractiveness, or appearance; allegations of wrongdoing (cheating, lying, crime, etc.); mental health, trauma, self-harm, addiction, or grief; anything sexual; or a verdict on the person's worth ("nobody likes you"). Roast ONLY behavior/habits/quirks. When in doubt, cut the line and keep it light and warm. Return ONLY the JSON schema.`;
 
 interface GistJSON {
   verdict: string;
@@ -81,6 +87,24 @@ function parseJSON(text: string): GistJSON {
   return JSON.parse(text.slice(start, end + 1));
 }
 
+// A guaranteed-safe, warm, generic gist used only when generation fails the safety check twice
+// (docs/GIST.md §15). Hits no bright lines — pure affection, no behavioral claims to flag — so a
+// graduated post is NEVER left without a gist. Persisted with model 'fallback-template'.
+const FALLBACK_MODEL = "fallback-template";
+function fallbackGist(): GistJSON {
+  return {
+    verdict: "Your people showed up — and they clearly adore you.",
+    gist:
+      "Your friends answered, and the throughline is simple: you're someone worth writing about. " +
+      "The takes are warm, a little chaotic, and unmistakably fond — the kind of thing people only " +
+      "bother to say about someone they actually love having around. There's more shape to come as " +
+      "more friends weigh in, but the headline is already clear: you matter to your people, and they " +
+      "wanted you to know it.",
+    excluded_count: 0,
+    tone_flag: "thin",
+  };
+}
+
 // Defense-in-depth: a cheap second pass over the OUTPUT (docs/GIST.md §15).
 async function safetyCheck(verdict: string, gist: string): Promise<boolean> {
   const out = await callAnthropic(
@@ -100,10 +124,11 @@ async function safetyCheck(verdict: string, gist: string): Promise<boolean> {
 
 // Generate (or regenerate, by accretion) the gist for a single post.
 export async function generateGistForPost(sb: SupabaseClient, postId: string): Promise<{ ok: boolean; tone_flag?: string; reason?: string }> {
-  // Post + prompt tone.
+  // Post + prompt text + the post's chosen spice level (the tone the gist calibrates to,
+  // GIST.md §7 / ROADMAP §0) + the owner's display name (GIST.md §3 required input).
   const { data: post } = await sb
     .from("posts")
-    .select("id, prompt_id, status, prompts(text, tone)")
+    .select("id, prompt_id, status, spice_level, prompts(text), users:profile_owner_id(display_name)")
     .eq("id", postId)
     .single();
   if (!post) return { ok: false, reason: "post not found" };
@@ -130,19 +155,46 @@ export async function generateGistForPost(sb: SupabaseClient, postId: string): P
 
   // deno-lint-ignore no-explicit-any
   const promptMeta = (post as any).prompts;
-  const tone = promptMeta?.tone ?? "social";
+  // deno-lint-ignore no-explicit-any
+  const ownerMeta = (post as any).users;
+  // The post's chosen spice level (capped at the prompt's tone by open_post/submit_reply) is the
+  // tone the generator calibrates to — NOT the raw prompt tone (ROADMAP §0, GIST.md §7).
+  // deno-lint-ignore no-explicit-any
+  const tone = (post as any).spice_level ?? "social";
   const promptText = promptMeta?.text ?? "";
+  const ownerName = ownerMeta?.display_name ?? "";
 
   const userContent =
-    `PROMPT: ${promptText}\nTONE: ${tone}\n\nPUBLIC REPLIES (${bodies.length}):\n` +
+    `PROMPT: ${promptText}\nTONE: ${tone}\n` +
+    (ownerName ? `OWNER_DISPLAY_NAME (this is who the gist is about — still address them in second person, "you"): ${ownerName}\n` : "") +
+    `\nPUBLIC REPLIES (${bodies.length}):\n` +
     bodies.map((b, i) => `${i + 1}. ${b}`).join("\n") +
     (prior ? `\n\nPREVIOUS GIST:\nverdict: ${prior.verdict ?? ""}\ngist: ${prior.body}` : "");
 
-  const raw = await callAnthropic(SYSTEM + (prior ? ACCRETION : ""), userContent, GEN_MODEL, 700);
-  const out = parseJSON(raw);
+  const baseSystem = SYSTEM + (prior ? ACCRETION : "");
 
-  if (!(await safetyCheck(out.verdict, out.gist))) {
-    return { ok: false, reason: "failed safety check — not published" };
+  // First generation, then the safety check (docs/GIST.md §15).
+  let out = parseJSON(await callAnthropic(baseSystem, userContent, GEN_MODEL, 700));
+  let model = GEN_MODEL;
+  let safe = await safetyCheck(out.verdict, out.gist);
+
+  // SAFETY RETRY: on failure, regenerate ONCE with a reinforced 'stay within the hard limits'
+  // instruction. Tolerate a thrown error on the retry so we still reach the fallback below.
+  if (!safe) {
+    try {
+      out = parseJSON(await callAnthropic(baseSystem + SAFETY_REINFORCE, userContent, GEN_MODEL, 700));
+      safe = await safetyCheck(out.verdict, out.gist);
+    } catch (_) {
+      safe = false;
+    }
+  }
+
+  // FALLBACK: if it STILL fails, write a safe warm generic template gist (model 'fallback-template')
+  // rather than leaving a graduated post without a gist. Never publish a flagged gist; never leave
+  // a graduated post gist-less (docs/GIST.md §15, ROADMAP A4).
+  if (!safe) {
+    out = fallbackGist();
+    model = FALLBACK_MODEL;
   }
 
   const { data: version } = await sb
@@ -151,7 +203,7 @@ export async function generateGistForPost(sb: SupabaseClient, postId: string): P
       gist_id: gist!.id,
       verdict: out.verdict,
       body: out.gist,
-      model: GEN_MODEL,
+      model,
       tone_flag: out.tone_flag,
       excluded_count: out.excluded_count ?? 0,
       reply_count_at_generation: bodies.length,

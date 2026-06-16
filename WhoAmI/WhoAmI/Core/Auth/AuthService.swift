@@ -16,6 +16,11 @@ protocol AuthService: Sendable {
     func signIn(email: String, password: String) async throws
     func sendOTP(phone: String) async throws
     func verifyOTP(phone: String, code: String) async throws
+    /// Sign in with Apple. Pass the identity token + the raw nonce used to request it
+    /// (Supabase compares the hashed nonce against the token's `nonce` claim).
+    func signInWithApple(idToken: String, nonce: String) async throws
+    /// Sign in with Google via the system web auth flow (ASWebAuthenticationSession).
+    func signInWithGoogle() async throws
     func signOut() async throws
     /// Emits whenever the underlying auth state changes (sign in / out / token refresh).
     func authChanges() -> AsyncStream<Void>
@@ -44,6 +49,19 @@ final class LiveAuthService: AuthService {
 
     func verifyOTP(phone: String, code: String) async throws {
         try await client.auth.verifyOTP(phone: phone, token: code, type: .sms)
+    }
+
+    func signInWithApple(idToken: String, nonce: String) async throws {
+        try await client.auth.signInWithIdToken(
+            credentials: .init(provider: .apple, idToken: idToken, nonce: nonce)
+        )
+    }
+
+    func signInWithGoogle() async throws {
+        try await client.auth.signInWithOAuth(
+            provider: .google,
+            redirectTo: URL(string: "whoami://auth-callback")
+        )
     }
 
     func signOut() async throws {

@@ -23,6 +23,9 @@ struct GistVersion: Codable, Identifiable, Sendable {
     var toneFlag: String?
     var excludedCount: Int
     var replyCountAtGeneration: Int
+    /// Set true when a revoke drops the graduated post below MIN_FLOOR (3) public replies —
+    /// surfaces a "based on fewer voices now" badge on the portrait.
+    var stale: Bool
     var createdAt: String?
 
     enum CodingKeys: String, CodingKey {
@@ -34,6 +37,7 @@ struct GistVersion: Codable, Identifiable, Sendable {
         case toneFlag = "tone_flag"
         case excludedCount = "excluded_count"
         case replyCountAtGeneration = "reply_count_at_generation"
+        case stale
         case createdAt = "created_at"
     }
 }

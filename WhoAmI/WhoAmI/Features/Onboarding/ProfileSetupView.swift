@@ -32,6 +32,17 @@ struct ProfileSetupView: View {
                         .textInputAutocapitalization(.never)
                 }
                 Section {
+                    Picker("Default spice", selection: $vm.defaultSpice) {
+                        ForEach(ProfileSetupViewModel.SpiceLevel.allCases) { level in
+                            Text(level.label).tag(level)
+                        }
+                    }
+                } header: {
+                    Text("Default spice")
+                } footer: {
+                    Text("Sets the default tone for prompts you open. You can change it anytime.")
+                }
+                Section {
                     Text("Your profile fills in once your friends start answering prompts about you.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
