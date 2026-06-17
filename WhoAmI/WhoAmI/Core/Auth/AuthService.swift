@@ -22,6 +22,8 @@ protocol AuthService: Sendable {
     /// Sign in with Google via the system web auth flow (ASWebAuthenticationSession).
     func signInWithGoogle() async throws
     func signOut() async throws
+    /// Hard-delete the current account (delete_my_account RPC; cascades all data).
+    func deleteAccount() async throws
     /// Emits whenever the underlying auth state changes (sign in / out / token refresh).
     func authChanges() -> AsyncStream<Void>
 }
@@ -66,6 +68,10 @@ final class LiveAuthService: AuthService {
 
     func signOut() async throws {
         try await client.auth.signOut()
+    }
+
+    func deleteAccount() async throws {
+        try await client.rpc("delete_my_account").execute()
     }
 
     func authChanges() -> AsyncStream<Void> {

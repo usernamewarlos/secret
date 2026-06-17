@@ -1,54 +1,62 @@
 import Foundation
 import Observation
 
+/// Backs the You tab + someone-else's profile. One `profile_feed` RPC populates the
+/// whole screen (owner header + archive with counts/private-counts/gist verdicts) —
+/// replacing the old per-post N+1 loops.
 @MainActor
 @Observable
 final class ProfileViewModel {
-    struct Row: Identifiable {
-        let post: Post
-        let prompt: Prompt?
-        let count: Int
-        var id: UUID { post.id }
-    }
-
     let ownerId: UUID?          // nil == me
-    var rows: [Row] = []
-    var heroVerdict: String?    // latest graduated gist verdict
+    let isOwner: Bool
+    private let titleFallback: String?
+
+    var owner: ProfileFeed.Owner?
+    var posts: [ProfileFeed.Post] = []
     var loading = true
     var error: String?
 
-    private let posts: PostsService
-    private let prompts: PromptsService
-    private let replies: RepliesService
-    private let gists: GistService
+    private let profile: ProfileService
+    private let auth: AuthService
 
-    init(ownerId: UUID?, posts: PostsService, prompts: PromptsService, replies: RepliesService, gists: GistService) {
+    init(ownerId: UUID?, titleFallback: String?, profile: ProfileService, auth: AuthService) {
         self.ownerId = ownerId
-        self.posts = posts
-        self.prompts = prompts
-        self.replies = replies
-        self.gists = gists
+        self.isOwner = ownerId == nil
+        self.titleFallback = titleFallback
+        self.profile = profile
+        self.auth = auth
+    }
+
+    /// First graduated post carrying a gist verdict — the hero portrait.
+    var heroPost: ProfileFeed.Post? {
+        posts.first { $0.status == .graduated && ($0.verdict?.isEmpty == false) }
+    }
+
+    var displayName: String {
+        if let n = owner?.displayName, !n.isEmpty { return n }
+        return titleFallback ?? (isOwner ? "You" : "Profile")
+    }
+
+    /// "@mayar · 4 repliers".
+    var handleLine: String {
+        let handle = (owner?.igHandle?.isEmpty == false) ? "@\(owner!.igHandle!)" : "@you"
+        let r = owner?.repliers ?? 0
+        return "\(handle) · \(r) replier\(r == 1 ? "" : "s")"
+    }
+
+    var photoURL: URL? {
+        guard let s = owner?.photoURL, let url = URL(string: s) else { return nil }
+        return url
     }
 
     func load() async {
         loading = true
         error = nil
+        guard let id = ownerId ?? auth.currentUserID else { loading = false; return }
         do {
-            let postList = ownerId == nil ? try await posts.myPosts() : try await posts.posts(ownerId: ownerId!)
-            var result: [Row] = []
-            for post in postList {
-                let prompt = try? await prompts.byId(post.promptId)
-                let count = (try? await replies.count(postId: post.id)) ?? 0
-                result.append(Row(post: post, prompt: prompt, count: count))
-            }
-            rows = result
-
-            if let firstGraduated = postList.first(where: { $0.status == .graduated }),
-               let version = try? await gists.currentVersion(postId: firstGraduated.id) {
-                heroVerdict = version.verdict
-            } else {
-                heroVerdict = nil
-            }
+            let feed = try await profile.profileFeed(ownerId: id)
+            owner = feed.owner
+            posts = feed.posts
         } catch {
             self.error = error.localizedDescription
         }

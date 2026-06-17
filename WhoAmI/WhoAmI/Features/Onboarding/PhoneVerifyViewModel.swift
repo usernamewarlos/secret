@@ -34,16 +34,18 @@ final class PhoneVerifyViewModel {
         busy = false
     }
 
-    func verify() async {
+    /// Returns true on a successful verification so the View can flip verified_phone.
+    func verify() async -> Bool {
         busy = true
         error = nil
+        defer { busy = false }
         do {
             try await auth.verifyOTP(phone: phone, code: code)
-            // Success flips auth state; SessionStore advances routing.
+            return true
         } catch {
             self.error = message(for: error)
+            return false
         }
-        busy = false
     }
 
     private func message(for error: Error) -> String {

@@ -9,10 +9,7 @@ struct WhoAmIApp: App {
             RootView()
                 .environment(container)
                 .environment(container.session)
-                .task {
-                    container.session.start()
-                    await container.notifications.requestAuthorization()
-                }
+                .task { container.session.start() }
         }
     }
 }

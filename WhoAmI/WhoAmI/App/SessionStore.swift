@@ -43,4 +43,29 @@ final class SessionStore {
         try? await auth.signOut()
         await refresh()
     }
+
+    /// Hard-delete the account (cascades all data), then clear the local session.
+    func deleteAccount() async throws {
+        try await auth.deleteAccount()
+        try? await auth.signOut()
+        await refresh()
+    }
+
+    #if DEBUG
+    /// Dev-only: when true, RootView replays the ENTIRE onboarding flow (intro →
+    /// age → notifications → profile setup → invite gate), independent of auth, so
+    /// it can be re-walked without creating a fresh account.
+    private(set) var debugReplayOnboarding = false
+
+    /// Start a full onboarding replay (Settings → "Reset onboarding").
+    func debugRestartOnboarding() {
+        OnboardingDraft.clear()
+        debugReplayOnboarding = true
+    }
+
+    /// End the replay (invite gate completed) and return to normal routing.
+    func endDebugReplay() {
+        debugReplayOnboarding = false
+    }
+    #endif
 }

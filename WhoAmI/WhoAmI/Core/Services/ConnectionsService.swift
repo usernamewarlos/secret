@@ -67,11 +67,23 @@ final class LiveConnectionsService: ConnectionsService {
     }
 
     func search(name: String) async throws -> [UserProfile] {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("@") { trimmed = String(trimmed.dropFirst()) }
+        // Strip characters that would break the PostgREST or() filter syntax.
+        trimmed = trimmed.replacingOccurrences(of: ",", with: " ")
+            .replacingOccurrences(of: "(", with: "").replacingOccurrences(of: ")", with: "")
         guard !trimmed.isEmpty else { return [] }
-        return try await client.from("users").select()
-            .ilike("display_name", pattern: "%\(trimmed)%")
+
+        // Match either display name OR @handle.
+        var results: [UserProfile] = try await client.from("users").select()
+            .or("display_name.ilike.*\(trimmed)*,ig_handle.ilike.*\(trimmed)*")
             .limit(20).execute().value
+
+        // Never surface myself or anyone I've blocked.
+        let me = client.auth.currentUser?.id
+        let blocked = Set((try? await blockedIds()) ?? [])
+        results.removeAll { $0.id == me || blocked.contains($0.id) }
+        return results
     }
 
     func block(userId: UUID) async throws {
