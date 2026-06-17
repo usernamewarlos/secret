@@ -115,7 +115,7 @@ struct ProfileView: View {
                 surface: .ink,
                 size: .sm
             )
-            if hero.stale { staleTag }
+            if hero.stale == true { staleTag }
         }
     }
 
@@ -190,7 +190,7 @@ struct ProfileView: View {
                     .lineSpacing(2)
                     .fixedSize(horizontal: false, vertical: true)
 
-                if post.stale {
+                if post.stale == true {
                     staleTag.padding(.top, Theme.Space.x3)
                 }
 

@@ -31,8 +31,9 @@ struct ProfileFeed: Codable, Sendable {
         let verdict: String?
         /// Current gist version's tone flag (`ok|thin|hostile`) — drives a soft cue on the card.
         let toneFlag: String?
-        /// True when a revoke thinned this graduated post below its voice floor.
-        let stale: Bool
+        /// True when a revoke thinned this graduated post below its voice floor. Optional so the
+        /// app decodes against both the pre- and post-0014 `profile_feed` (key absent => nil).
+        let stale: Bool?
 
         enum CodingKeys: String, CodingKey {
             case id, status, threshold
