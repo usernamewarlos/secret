@@ -8,6 +8,7 @@ struct TodayView: View {
     @Environment(AppContainer.self) private var container
     @State private var vm: TodayViewModel?
     @State private var answerTarget: TodayTarget?
+    @State private var toast: String?
 
     private let spiceLevels = ["wholesome", "playful", "social", "spicy"]
 
@@ -39,11 +40,30 @@ struct TodayView: View {
                     AnswerView(prompt: vm.prompt(for: target), owner: vm.owner(for: target),
                                count: target.count, threshold: target.threshold) {
                         vm.markAnswered(target.ownerId)
+                        toast = "Reply sent ✓"
                     }
                     .presentationDetents([.large])
                     .presentationDragIndicator(.hidden)
                 }
             }
+            .overlay(alignment: .bottom) {
+                if let toast {
+                    Text(toast)
+                        .font(BrandFont.hanken(14, .bold))
+                        .foregroundStyle(Theme.text)
+                        .padding(.horizontal, Theme.Space.x5)
+                        .padding(.vertical, Theme.Space.x3)
+                        .background(Capsule().fill(Theme.surface2))
+                        .overlay(Capsule().strokeBorder(Theme.border, lineWidth: 1))
+                        .padding(.bottom, Theme.Space.x6)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .task {
+                            try? await Task.sleep(nanoseconds: 2_000_000_000)
+                            self.toast = nil
+                        }
+                }
+            }
+            .animation(Theme.Motion.spring, value: toast)
         }
     }
 

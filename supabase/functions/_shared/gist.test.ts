@@ -5,7 +5,7 @@
 // (The full generateGistForPost flow needs a Supabase client mock and a stubbed Anthropic fetch;
 // these cover the highest-risk new branches without that scaffolding.)
 import { assert, assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { clampVerdict, coerceGist, modelAcceptsTemperature, modelSupportsStructuredOutput, DEFAMATION } from "./gist.ts";
+import { clampVerdict, coerceGist, modelAcceptsTemperature, modelSupportsStructuredOutput, DEFAMATION } from "./gist_prompt.ts";
 
 Deno.test("clampVerdict keeps short verdicts verbatim", () => {
   const v = "The human aux cord — always running the vibe.";
