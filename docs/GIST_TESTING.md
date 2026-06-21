@@ -54,3 +54,48 @@ exact "horoscope filler" the spec forbids. But the cost is **sub-cent per gist**
   later.
 - Keep the deterministic DEFAMATION regex + safety classifier + fallback regardless of engine — no
   provider gives you *your* bright lines.
+
+## Deploy production for $0 (Groq free tier)
+
+The gist Edge Function (`gist.ts`) is **provider-flexible** — it picks its engine from whichever
+secret is set, so switching is a secret change, not a code change:
+
+| Set this Edge-Function secret | Engine |
+|---|---|
+| `GROQ_API_KEY` (+ optional `GROQ_MODEL`, `GROQ_SAFETY_MODEL`) | **Groq free tier — the $0 path** |
+| `OPENAI_COMPAT_URL` / `_KEY` / `_MODEL` | any OpenAI-compatible endpoint |
+| `ANTHROPIC_API_KEY` (+ optional `ANTHROPIC_MODEL`) | Anthropic (paid upgrade lane) |
+
+`GIST_PROVIDER=anthropic|groq|openai` forces the choice if more than one is set.
+
+### One-time setup (you do these — they need your key + live DB access)
+
+```sh
+# 1. Free Groq key (no credit card): https://console.groq.com → API Keys → Create.
+#    In Groq settings, turn ON Zero Data Retention (so your users' replies are never retained).
+
+# 2. Point the gist at Groq (Edge Function secrets):
+supabase secrets set GROQ_API_KEY=gsk_xxx \
+  GROQ_MODEL=llama-3.3-70b-versatile          # or openai/gpt-oss-120b for best quality
+
+# 3. Apply the audit migration (adds revoke re-spin, profile_feed stale/tone, deck, etc.):
+supabase db push                               # or run supabase/migrations/0014_*.sql in the SQL editor
+
+# 4. Deploy the functions:
+supabase functions deploy generate-gist regenerate-gists
+
+# 5. Let graduation auto-fire the gist (SQL editor — service_role is a secret, you set it):
+#    alter database postgres set app.functions_base_url = 'https://<project-ref>.functions.supabase.co';
+#    alter database postgres set app.service_role_key  = '<service_role_key>';
+
+# 6. (optional) schedule the batched regen cron — uncomment the regenerate-gists job in
+#    supabase/migrations/0008_cron.sql, or schedule it from the SQL editor.
+```
+
+After that, a post graduating (organically, or via the Settings → dev tools) fires a **real Groq
+gist**. Pin `GROQ_MODEL` to a current model — Groq deprecates model ids periodically. To upgrade to
+Claude later: `supabase secrets set ANTHROPIC_API_KEY=...` and `GIST_PROVIDER=anthropic` (or unset
+`GROQ_API_KEY`). No code change.
+
+> Note: the dev "Generate responses" button *fabricates* a canned gist (it predates the real path);
+> to exercise the real Groq generator in-app, let a post graduate from real replies.
